@@ -3,8 +3,6 @@ package lua
 import (
 	"fmt"
 	"os"
-
-	"golang.org/x/net/context"
 )
 
 type LValueType int
