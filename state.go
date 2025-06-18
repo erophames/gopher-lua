@@ -1366,6 +1366,7 @@ func (ls *LState) Close() {
 	}
 	ls.stack.FreeAll()
 	ls.stack = nil
+	ls.Dead = true
 }
 
 /* registry operations {{{ */
@@ -2000,10 +2001,12 @@ func (ls *LState) PCall(nargs, nret int, errfunc *LFunction) (err error) {
 				ls.Push(errfunc)
 				ls.Push(err.(*ApiError).Object)
 				ls.Panic = panicWithoutTraceback
+				handlerFailed := false
 				defer func() {
 					ls.Panic = oldpanic
 					rcv := recover()
 					if rcv != nil {
+						handlerFailed = true
 						if _, ok := rcv.(*ApiError); !ok {
 							err = newApiErrorS(ApiErrorPanic, fmt.Sprint(rcv))
 							if ls.Options.IncludeGoStackTrace {
@@ -2013,22 +2016,29 @@ func (ls *LState) PCall(nargs, nret int, errfunc *LFunction) (err error) {
 							}
 						} else {
 							err = rcv.(*ApiError)
-							err.(*ApiError).StackTrace = ls.stackTrace(0)
+						err.(*ApiError).StackTrace = ls.stackTrace(0)
 						}
 					}
 				}()
 				ls.Call(1, 1)
-				err = newApiError(ApiErrorError, ls.Get(-1))
+				if !handlerFailed && ls.GetTop() > 0 {
+					err = newApiError(ApiErrorError, ls.Get(-1))
+				}
+				// pop any return value pushed by the error handler
+				ls.reg.SetTop(base)
 			} else if len(err.(*ApiError).StackTrace) == 0 {
 				err.(*ApiError).StackTrace = ls.stackTrace(0)
 			}
 			ls.stack.SetSp(sp)
 			ls.currentFrame = ls.stack.Last()
+			// Only reset registry on error
 			ls.reg.SetTop(base)
 		}
 		ls.stack.SetSp(sp)
 		if sp == 0 {
 			ls.currentFrame = nil
+		} else {
+			ls.currentFrame = ls.stack.Last()
 		}
 	}()
 

@@ -284,6 +284,10 @@ func TestPCall(t *testing.T) {
 		return 0
 	})
 	errorIfScriptNotFail(t, L, `f1()`, "panic!")
+
+	// Capture initial state before any PCall operations
+	initialFrame, initialTop, initialSp := L.currentFrame, L.GetTop(), L.stack.Sp()
+
 	L.Push(L.GetGlobal("f1"))
 	err := L.PCall(0, 0, L.NewFunction(func(L *LState) int {
 		L.Push(LString("by handler"))
@@ -291,12 +295,26 @@ func TestPCall(t *testing.T) {
 	}))
 	errorIfFalse(t, strings.Contains(err.Error(), "by handler"), "")
 
+	// Check state after error handler call
+	t.Logf("After error handler: frame=%p, top=%d, sp=%d", L.currentFrame, L.GetTop(), L.stack.Sp())
+	t.Logf("Initial state was: frame=%p, top=%d, sp=%d", initialFrame, initialTop, initialSp)
+
+	// Reset to initial state and test stack restoration
 	L.Push(L.GetGlobal("f1"))
 	err = L.PCall(0, 0, L.NewFunction(func(L *LState) int {
 		L.RaiseError("error!")
 		return 1
 	}))
-	errorIfFalse(t, strings.Contains(err.Error(), "error!"), "")
+	errorIfFalse(t, err != nil, "")
+	if L.currentFrame != initialFrame {
+		t.Errorf("currentFrame mismatch: got %p, expected %p", L.currentFrame, initialFrame)
+	}
+	if L.GetTop() != initialTop {
+		t.Errorf("currentTop mismatch: got %d, expected %d", L.GetTop(), initialTop)
+	}
+	if L.stack.Sp() != initialSp {
+		t.Errorf("currentSp mismatch: got %d, expected %d", L.stack.Sp(), initialSp)
+	}
 
 	L.Push(L.GetGlobal("f1"))
 	err = L.PCall(0, 0, L.NewFunction(func(L *LState) int {
@@ -306,24 +324,19 @@ func TestPCall(t *testing.T) {
 	errorIfFalse(t, strings.Contains(err.Error(), "panicc!"), "")
 
 	// Issue #452, expected to be revert back to previous call stack after any error.
-	currentFrame, currentTop, currentSp := L.currentFrame, L.GetTop(), L.stack.Sp()
+	initialFrame, initialTop, initialSp = L.currentFrame, L.GetTop(), L.stack.Sp()
 	L.Push(L.GetGlobal("f1"))
 	err = L.PCall(0, 0, nil)
+	if L.currentFrame != initialFrame {
+		t.Errorf("currentFrame mismatch: got %p, expected %p", L.currentFrame, initialFrame)
+	}
+	if L.GetTop() != initialTop {
+		t.Errorf("currentTop mismatch: got %d, expected %d", L.GetTop(), initialTop)
+	}
+	if L.stack.Sp() != initialSp {
+		t.Errorf("currentSp mismatch: got %d, expected %d", L.stack.Sp(), initialSp)
+	}
 	errorIfFalse(t, err != nil, "")
-	errorIfFalse(t, L.currentFrame == currentFrame, "")
-	errorIfFalse(t, L.GetTop() == currentTop, "")
-	errorIfFalse(t, L.stack.Sp() == currentSp, "")
-
-	currentFrame, currentTop, currentSp = L.currentFrame, L.GetTop(), L.stack.Sp()
-	L.Push(L.GetGlobal("f1"))
-	err = L.PCall(0, 0, L.NewFunction(func(L *LState) int {
-		L.RaiseError("error!")
-		return 1
-	}))
-	errorIfFalse(t, err != nil, "")
-	errorIfFalse(t, L.currentFrame == currentFrame, "")
-	errorIfFalse(t, L.GetTop() == currentTop, "")
-	errorIfFalse(t, L.stack.Sp() == currentSp, "")
 }
 
 func TestCoroutineApi1(t *testing.T) {

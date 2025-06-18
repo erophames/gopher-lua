@@ -1,6 +1,7 @@
 package lua
 
 import (
+	"context"
 	"fmt"
 	"os"
 )
@@ -209,7 +210,7 @@ type LState struct {
 
 	stop         int32
 	reg          *registry
-	stack        *callFrameStack
+	stack        callFrameStack
 	alloc        *allocator
 	currentFrame *callFrame
 	wrapped      bool
@@ -217,7 +218,10 @@ type LState struct {
 	hasErrorFunc bool
 	mainLoop     func(*LState, *callFrame)
 	ctx          context.Context
+	cthook       Hooker
 	lhook        Hooker
+	chook        Hooker
+	rhook        Hooker
 	prevline     int
 }
 
@@ -226,6 +230,11 @@ func (ls *LState) Type() LValueType                   { return LTThread }
 func (ls *LState) assertFloat64() (float64, bool)     { return 0, false }
 func (ls *LState) assertString() (string, bool)       { return "", false }
 func (ls *LState) assertFunction() (*LFunction, bool) { return nil, false }
+
+// IsClosed reports whether the LState has been closed.
+func (ls *LState) IsClosed() bool {
+	return ls.Dead
+}
 
 type LUserData struct {
 	Value     interface{}

@@ -35,8 +35,9 @@ func debugSetHook(L *LState) int {
 	L.CheckTypes(2, LTString)
 	callbackArg := L.OptFunction(1, nil)
 	eventArg := L.OptString(2, "")
-	L.Pop(2)
-	_ = L.SetHook(callbackArg, eventArg)
+	countArg := L.OptInt(3, 0)
+	L.Pop(L.GetTop())
+	_ = L.SetHook(callbackArg, eventArg, countArg)
 	return 0
 }
 

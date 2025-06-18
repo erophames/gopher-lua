@@ -267,12 +267,15 @@ func basePCall(L *LState) int {
 	}
 	nargs := L.GetTop() - 1
 	if err := L.PCall(nargs, MultRet, nil); err != nil {
-		L.Push(LFalse)
+		var errObj LValue
 		if aerr, ok := err.(*ApiError); ok {
-			L.Push(aerr.Object)
+			errObj = aerr.Object
 		} else {
-			L.Push(LString(err.Error()))
+			errObj = LString(err.Error())
 		}
+		L.SetTop(nargs + 1)
+		L.Push(LFalse)
+		L.Push(errObj)
 		return 2
 	} else {
 		L.Insert(LTrue, 1)
@@ -464,12 +467,15 @@ func baseXPCall(L *LState) int {
 	top := L.GetTop()
 	L.Push(fn)
 	if err := L.PCall(0, MultRet, errfunc); err != nil {
-		L.Push(LFalse)
+		var errObj LValue
 		if aerr, ok := err.(*ApiError); ok {
-			L.Push(aerr.Object)
+			errObj = aerr.Object
 		} else {
-			L.Push(LString(err.Error()))
+			errObj = LString(err.Error())
 		}
+		L.SetTop(top)
+		L.Push(LFalse)
+		L.Push(errObj)
 		return 2
 	} else {
 		L.Insert(LTrue, top+1)

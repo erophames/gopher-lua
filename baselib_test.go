@@ -9,6 +9,7 @@ import (
 func TestOsDateFormatUTCWithTwoParam(t *testing.T) {
 	t.Setenv("TZ", "Asia/Tokyo")
 	ls := NewState()
+	defer ls.Close()
 
 	g := ls.GetGlobal("os")
 	fn := ls.GetField(g, "date")

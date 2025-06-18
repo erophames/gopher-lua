@@ -334,22 +334,40 @@ func fileReadAux(L *LState, file *lFile, idx int) int {
 		case LNumber:
 			size := int64(lv)
 			if size == 0 {
+				// Peek one byte to determine EOF without consuming it.
 				_, err = file.reader.ReadByte()
 				if err == io.EOF {
+					// At EOF, io.read(0) returns nil.
 					L.Push(LNil)
 					goto normalreturn
 				}
-				file.reader.UnreadByte()
+				if err != nil {
+					goto errreturn
+				}
+				// There is data available; unread the byte we just read and
+				// return an empty string as Lua expects.
+				if uerr := file.reader.UnreadByte(); uerr != nil {
+					err = uerr
+					goto errreturn
+				}
+				L.Push(emptyLString)
+				goto normalreturn
 			}
 			var buf []byte
 			var iseof bool
 			buf, err, iseof = readBufioSize(file.reader, size)
-			if iseof {
+			if iseof || err == io.EOF {
+				// Reached EOF: return nil with no error object, per Lua semantics.
 				L.Push(LNil)
 				goto normalreturn
 			}
 			if err != nil {
 				goto errreturn
+			}
+			if len(buf) == 0 {
+				// No bytes read yet (buffer empty) but not EOF: return empty string like Lua.
+				L.Push(emptyLString)
+				goto normalreturn
 			}
 			L.Push(LString(string(buf)))
 		case LString:

@@ -36,13 +36,11 @@ func (lh *LHook) String() string {
 
 type CHook struct {
 	callback *LFunction
-	line     int
 }
 
-func newCHook(callback *LFunction, line int) *CHook {
+func newCHook(callback *LFunction) *CHook {
 	return &CHook{
 		callback: callback,
-		line:     line,
 	}
 }
 
@@ -54,15 +52,44 @@ func (ch *CHook) String() string {
 	return fmt.Sprintf("hook: %p", ch)
 }
 
-type RHook struct {
+type CTHook struct {
 	callback *LFunction
-	line     int
+	count    int
+	counter  int
 }
 
-func newRHook(callback *LFunction, line int) *RHook {
+func newCTHook(callback *LFunction, count int) *CTHook {
+	return &CTHook{
+		callback: callback,
+		count:    count,
+		counter:  0,
+	}
+}
+
+func (ct *CTHook) call(L *LState, cf *callFrame) {
+	if ct.count <= 0 {
+		return
+	}
+	ct.counter++
+	if ct.counter >= ct.count {
+		ct.counter = 0
+		L.reg.Push(ct.callback)
+		L.reg.Push(LString("c"))
+		L.callR(1, 0, -1)
+	}
+}
+
+func (ct *CTHook) String() string {
+	return fmt.Sprintf("hook: %p", ct)
+}
+
+type RHook struct {
+	callback *LFunction
+}
+
+func newRHook(callback *LFunction) *RHook {
 	return &RHook{
 		callback: callback,
-		line:     line,
 	}
 }
 
